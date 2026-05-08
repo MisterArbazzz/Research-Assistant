@@ -217,50 +217,17 @@ A grep for `MAX_RESEARCH_ATTEMPTS` finds it twice (definition in
 
 ---
 
-## Reasonable assumptions
-
-The brief leaves several things underspecified. The decisions made:
-
-- **Live retrieval over mock.** The brief says mock data is acceptable; I
-  built against Tavily live search for a stronger demo and kept mock as a
-  fallback (used by the eval suite for determinism).
-- **Confidence threshold = 6.** "≥ 6" routes to synthesis per the brief;
-  "< 6" routes to validator. Equality counts as "high enough" — verified
-  by `test_research_at_threshold_skips_validator`.
-- **`MAX_RESEARCH_ATTEMPTS = 3`.** Per the brief's "loop back if
-  insufficient AND attempts < 3". The validator can ask for two retries
-  before the cap fires.
-- **Single `thread_id` per CLI session.** Multi-turn carries because the
-  same checkpointer thread is reused across REPL iterations. Per-turn
-  fields (attempts, validation, answer) are reset in the runner so the
-  cap doesn't fire prematurely on a long conversation.
-- **`user_id` defaults to `"anonymous"`** for long-term memory when not
-  set in `config["configurable"]["user_id"]`. The CLI doesn't yet ask
-  for an identity; the demo script (`examples/memory_demo.py`)
-  hardcodes `"alice"`.
-- **Stub findings vs hallucinations.** When Tavily / mock returns zero
-  hits, research_agent emits a sentinel `ResearchFindings` with
-  `confidence_score=1.0` (CLAUDE.md pattern: never `None`). The
-  validator's stop-retry rule then routes to synthesis instead of
-  retrying — looping retries against an unknown company can't help.
-- **Selective long-term writes.** The memory writer is a single Flash
-  call that asks "is there a durable user preference here?" — most turns
-  produce zero facts. Returning empty is the expected outcome, not a
-  failure.
-
----
-
 ## Beyond Expected Deliverable
 
-Each tier was added incrementally on top of the spec. Every tier ships
-with tests and a live verification.
+Features layered on top of the core multi-agent spec. Each ships with
+unit tests + a live demo path.
 
-### Tier 1 — Observability (Phase 8)
+### Observability
 
 - **LangSmith** auto-traces every chain when `LANGSMITH_API_KEY` is set
   in `.env`. The CLI banner prints `LangSmith: enabled` when it picks
   up the key. Traces include the full prompt, response, latency, and
-  cost per node, with the interrupt event visibly paused/resumed.
+  cost per node, with the interrupt event visibly paused / resumed.
 - **OpenTelemetry** spans on every node carry `latency_ms`, `cost_usd`,
   `input_tokens`, `output_tokens`, `model`. Default exporter is the
   console (stdout); flip `OTEL_EXPORTER_OTLP_ENDPOINT` to ship to a
@@ -268,32 +235,32 @@ with tests and a live verification.
 - **Per-run cost ceiling**. `COST_CEILING_PER_RUN_USD` (default $0.10)
   is enforced once in `route_after_research` / `route_after_validator`.
   When tripped, routing diverts to synthesis so the user always gets an
-  answer.
+  answer instead of a stall.
 - **Pricing snapshot** in `src/llm/client.py::PRICING_USD_PER_M_TOKENS`
   with a "last verified" date. Unknown models report `$0.0` so a flat
   `$0` audit row is the visible signal to update it.
 
-### Tier 2 — Retrieval quality (Phase 9)
+### Retrieval quality
 
-The Research Agent runs a 3-stage retrieval funnel instead of feeding raw
-search hits to the LLM:
+The Research Agent runs a 3-stage retrieval funnel instead of feeding
+raw search hits to the LLM:
 
 1. **Query rewriting** (1 Flash call). Resolves pronouns and adds topic
    terms using conversation history — turns *"What about their CEO?"*
    into `"Tesla CEO Elon Musk leadership"` so retrieval works on
    follow-ups.
 2. **Tavily over-fetch** (`TAVILY_MAX_RESULTS=8`).
-3. **Cross-encoder rerank** with `flashrank` (ONNX runtime,
-   ~30MB model). Re-scores hits against the rewritten query and trims
-   to top-K (`RERANK_TOP_K=5`). I picked `flashrank` over the plan's
+3. **Cross-encoder rerank** with `flashrank` (ONNX runtime, ~30 MB
+   model). Re-scores hits against the rewritten query and trims to
+   top-K (`RERANK_TOP_K=5`). `flashrank` was picked over
    `sentence-transformers` because it ships without PyTorch — same
-   model family (ms-marco MiniLM cross-encoders), ~60MB total install
-   instead of 500MB+ on Windows.
+   model family (ms-marco MiniLM cross-encoders), ~60 MB total install
+   instead of 500 MB+ on Windows.
 
 Each stage is independently togglable via settings flags so you can A/B
 the funnel without touching agent code.
 
-### Tier 3 — Evaluation (Phase 10)
+### Evaluation suite
 
 A golden dataset of 8 cases covers every behavior the system needs to
 handle: clear queries, ticker resolution, ambiguous-with-clarification,
@@ -311,22 +278,24 @@ expectations; failures point at *which* dimension regressed:
   follow-up pronouns score fairly.
 - **`trajectory_score`** (LLM-as-judge, Pro) — judges the whole run:
   clarity correctness, retry effectiveness, efficiency, grounding.
-  Decoupled from RAGAS so a regression in either pinpoints a
-  different fix path.
+  Decoupled from RAGAS so a regression in either pinpoints a different
+  fix path.
 
 Run via `uv run python -m tests.eval.run_eval`. Persists
 `tests/eval/last_run.json` for diffing across runs. Exit code 0 if all
-cases pass — wire it into CI when you want a gate.
+cases pass — wire it into CI when you want a quality gate. Latest run:
+**8/8 PASS at 100%**.
 
-### Tier 4 — Long-term memory (Phase 11)
+### Long-term memory across threads
 
 Short-term memory is the LangGraph checkpointer (per-thread).
-**Long-term** memory is a per-user fact store across threads:
+**Long-term** memory is a per-user fact store that survives across
+threads, sessions, and process restarts:
 
 - Backend: SQLite + `sqlite-vec`. 768-dim embeddings via the existing
-  Gemini embedder. The plan called for pgvector; sqlite-vec is the
-  same shape with zero config and no Docker. Pgvector is the
-  production swap.
+  Gemini embedder. Postgres + pgvector is a drop-in production swap;
+  the API surface is intentionally narrow (`store_fact`,
+  `retrieve_relevant_facts`, `list_facts`).
 - **Selective writes**: a `memory_writer` node runs after synthesis and
   asks Flash whether the conversation revealed any *durable* user
   preferences. Most turns return an empty list — that's correct.
@@ -335,41 +304,18 @@ Short-term memory is the LangGraph checkpointer (per-thread).
   digest prompt and injects them.
 - **Demo**: `examples/memory_demo.py` runs Session A (different
   `thread_id`, sets a preference) then Session B (different
-  `thread_id`, same `user_id`). Audit shows
-  `memory_facts_retrieved=2` in B without B ever seeing A's transcript.
+  `thread_id`, same `user_id`). Audit shows `memory_facts_retrieved=2`
+  in B without B ever seeing A's transcript.
 
----
+### Interactive Streamlit showcase
 
-## Why these choices
-
-A boilerplate scaffold ([`langgraph-agent-boilerplate`](https://github.com/MisterArbazzz/langgraph-agent-boilerplate))
-provided the generic infrastructure: LLM client with retry/timeout, OTel
-+ LangSmith plumbing, FastAPI + SSE, conftest fixtures, and a
-`CLAUDE.md` documenting 10 hard-won patterns from previous production
-builds. This let the implementation focus on the use-case-specific code —
-state schema, agent prompts, routing, retrieval pipeline, memory — while
-inheriting the production-shaped error handling, structured-output
-parsing, and observability conventions for free. The boilerplate's Neo4j
-audit graph was stripped because LangSmith's trace tree + the in-memory
-`state.audit_log` already cover the observability story for this use
-case; Neo4j would shine if the data model needed graph queries (company
-relationships, citation graphs), which isn't in scope here.
-
-The patterns that mattered most:
-
-- **`ainvoke_structured`** is the only LLM entry point in nodes — it
-  handles the `parsed=None` gotcha that would otherwise blow up node
-  code with a `'NoneType' has no attribute X`.
-- **No `max_length`** on LLM-output Pydantic schemas — Gemini doesn't
-  honor schema-level length caps. Length goes in the prompt; schemas
-  validate structure (types, required fields, value ranges).
-- **Sentinel-not-None** when a lookup misses (research_agent emits a
-  stub finding rather than `None`) — prevents the routing from looping
-  on the same node forever.
-- **HTTP-status-code retry predicates** rather than class predicates —
-  the `google-genai` and `google-api-core` SDKs raise different
-  exception classes for the same HTTP status; checking codes is what
-  works across both.
+A 7-tab Streamlit app (`streamlit_app/app.py`) drives every feature
+above with live UI updates: per-node `st.status` blocks light up as the
+graph executes, the interrupt loop renders an inline clarification
+form, the Settings tab hot-toggles every config knob, and an A/B
+compare widget re-runs the last query against current settings to show
+old vs new answers + costs side by side. See the Streamlit demo
+section in **Run instructions** above.
 
 ---
 

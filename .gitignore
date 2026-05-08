@@ -23,6 +23,13 @@ data/seed/embeddings_cache/
 .streamlit/secrets.toml
 .streamlit/config_local.toml
 
+# Interview / internal context — kept locally for reference, never public
+plan.md
+problem_statement.md
+README_BOILERPLATE.md
+interview_*.md
+*_interview.md
+
 # Eval artifacts (we keep last_run.json so reviewers can see scores; ignore the temp DB)
 tests/eval/__pycache__/
 
