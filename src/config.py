@@ -28,11 +28,6 @@ class Settings(BaseSettings):
     MODEL_QA: str = "gemini-2.5-pro"
     LLM_RETRY_MAX_ATTEMPTS: int = 4
 
-    # Neo4j
-    NEO4J_URI: str = "bolt://localhost:7687"
-    NEO4J_USER: str = "neo4j"
-    NEO4J_PASSWORD: str = "devpassword"
-
     # Observability — all optional
     LANGSMITH_API_KEY: str | None = None
     LANGSMITH_PROJECT: str | None = None
@@ -46,7 +41,19 @@ class Settings(BaseSettings):
     # Tavily is the default; mock is a hermetic fallback for tests / offline dev.
     RESEARCH_BACKEND: Literal["mock", "tavily"] = "tavily"
     TAVILY_API_KEY: str | None = None
-    TAVILY_MAX_RESULTS: int = 5
+    TAVILY_MAX_RESULTS: int = 8  # over-fetch so rerank has options
+
+    # Retrieval quality (Tier 2). Query rewriting is a flash LLM call;
+    # reranker is a local ONNX cross-encoder (~30MB model, downloaded on first use).
+    QUERY_REWRITE_ENABLED: bool = True
+    RERANK_ENABLED: bool = True
+    RERANK_MODEL: str = "ms-marco-MiniLM-L-12-v2"
+    RERANK_TOP_K: int = 5
+
+    # Long-term memory (Tier 4). Cross-thread per-user fact store via
+    # sqlite-vec. Disable in tests/CI to avoid touching the local DB.
+    LONGTERM_MEMORY_ENABLED: bool = True
+    LONGTERM_MEMORY_TOP_K: int = 3
 
     # Caps — defensive boundaries enforced at single sites in routing.py.
     # MAX_RESEARCH_ATTEMPTS caps the validator → research retry loop.
@@ -59,4 +66,4 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     """Cached settings singleton. Use this everywhere; never read os.environ directly."""
-    return Settings()  # type: ignore[call-arg]  # pydantic-settings reads env at runtime
+    return Settings()  # pydantic-settings reads env at runtime

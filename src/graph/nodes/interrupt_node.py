@@ -21,7 +21,6 @@ from langgraph.types import interrupt
 from opentelemetry import trace
 
 from ..state import ResearchState
-from ._audit_helpers import safe_record_step
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -50,14 +49,6 @@ async def interrupt_node(
         )
 
         # Resume path — only reached after the caller resumes with Command(resume=...).
-        await safe_record_step(
-            config,
-            state.run_id,
-            "interrupt_node",
-            latency_ms=0,
-            metadata={"human_response_received": True, "response": str(human_response)},
-        )
-
         clarification_text = str(human_response or "").strip()
 
         return {

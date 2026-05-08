@@ -36,6 +36,7 @@ async def test_graph_has_all_nodes() -> None:
         "research_agent",
         "validator_agent",
         "synthesis_agent",
+        "memory_writer",
         "__end__",
     }
     assert expected.issubset(nodes)
@@ -49,5 +50,6 @@ async def test_graph_edges_include_retry_loop() -> None:
     assert ("validator_agent", "research_agent") in pairs
     # Interrupt → Clarity is the human-in-the-loop resume path.
     assert ("interrupt_node", "clarity_agent") in pairs
-    # Synthesis → END
-    assert ("synthesis_agent", "__end__") in pairs
+    # Synthesis → memory_writer → END (Tier 4)
+    assert ("synthesis_agent", "memory_writer") in pairs
+    assert ("memory_writer", "__end__") in pairs

@@ -19,7 +19,6 @@ from ...config import get_settings
 from ...llm.client import ainvoke_structured, estimate_cost, get_chat_model
 from ..prompts import build_clarity_system, format_history
 from ..state import ParsedClarity, ResearchState
-from ._audit_helpers import safe_record_step
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -55,13 +54,6 @@ async def clarity_agent(state: ResearchState, config: RunnableConfig) -> dict[st
                 "clarity_agent parse failure — defaulting to 'clear'",
                 extra={"run_id": state.run_id, "error": str(exc)},
             )
-            await safe_record_step(
-                config,
-                state.run_id,
-                "clarity_agent",
-                latency_ms,
-                metadata={"parse_error": str(exc)},
-            )
             return {
                 "clarity_status": "clear",
                 "audit_log": [
@@ -80,21 +72,10 @@ async def clarity_agent(state: ResearchState, config: RunnableConfig) -> dict[st
 
         span.set_attribute("latency_ms", latency_ms)
         span.set_attribute("cost_usd", round(cost_usd, 6))
+        span.set_attribute("input_tokens", in_tokens)
+        span.set_attribute("output_tokens", out_tokens)
+        span.set_attribute("model", settings.MODEL_PRIMARY)
         span.set_attribute("clarity_status", parsed.clarity_status)
-
-        await safe_record_step(
-            config,
-            state.run_id,
-            "clarity_agent",
-            latency_ms,
-            prompt_tokens=in_tokens,
-            completion_tokens=out_tokens,
-            cost_usd=cost_usd,
-            metadata={
-                "clarity_status": parsed.clarity_status,
-                "company": parsed.company,
-            },
-        )
 
         return {
             "clarity_status": parsed.clarity_status,

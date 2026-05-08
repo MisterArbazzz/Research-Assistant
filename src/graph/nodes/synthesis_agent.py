@@ -22,7 +22,6 @@ from ...config import get_settings
 from ...llm.client import ainvoke_with_retry, estimate_cost, get_chat_model
 from ..prompts import build_synthesis_system, format_history
 from ..state import ResearchState
-from ._audit_helpers import safe_record_step
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -60,7 +59,7 @@ async def synthesis_agent(state: ResearchState, config: RunnableConfig) -> dict[
         t0 = perf_counter()
         try:
             response = await ainvoke_with_retry(llm, prompt_messages)
-        except Exception as exc:  # noqa: BLE001 — surface a graceful answer
+        except Exception as exc:
             latency_ms = int((perf_counter() - t0) * 1000)
             logger.exception(
                 "synthesis_agent LLM call failed",
@@ -70,13 +69,6 @@ async def synthesis_agent(state: ResearchState, config: RunnableConfig) -> dict[
                 "I ran into a technical issue producing a polished answer, but "
                 f"here's what the research found about {state.company}: "
                 + json.dumps(state.research_findings or {}, indent=2)
-            )
-            await safe_record_step(
-                config,
-                state.run_id,
-                "synthesis_agent",
-                latency_ms,
-                metadata={"error": str(exc)},
             )
             return {
                 "final_answer": fallback_answer,
@@ -102,18 +94,11 @@ async def synthesis_agent(state: ResearchState, config: RunnableConfig) -> dict[
 
         span.set_attribute("latency_ms", latency_ms)
         span.set_attribute("cost_usd", round(cost_usd, 6))
+        span.set_attribute("input_tokens", in_tokens)
+        span.set_attribute("output_tokens", out_tokens)
+        span.set_attribute("model", settings.MODEL_PRIMARY)
         span.set_attribute("answer_chars", len(answer_text))
 
-        await safe_record_step(
-            config,
-            state.run_id,
-            "synthesis_agent",
-            latency_ms,
-            prompt_tokens=in_tokens,
-            completion_tokens=out_tokens,
-            cost_usd=cost_usd,
-            metadata={"answer_chars": len(answer_text)},
-        )
 
         return {
             "final_answer": answer_text,

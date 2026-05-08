@@ -2,7 +2,7 @@
 RUN 2 — Ambiguous → interrupt → resume → multi-turn follow-up
 ========================================================================
 
-thread_id: demo-2-827e266c (same thread used for both turns)
+thread_id: demo-2-5491dcb5 (same thread used for both turns)
 
 You (turn 1): How is the company doing?
 
@@ -12,39 +12,50 @@ You (turn 1): How is the company doing?
   Resuming with: 'Tesla'
 
 --- TURN 1 AUDIT TRAIL ---
-  • clarity_agent: clarity_status=needs_clarification, latency_ms=1499, cost_usd=0.000
+  • clarity_agent: clarity_status=needs_clarification, latency_ms=1885, cost_usd=0.000
   • interrupt_node: 
-  • clarity_agent: clarity_status=clear, company=Tesla, latency_ms=1708, cost_usd=0.000
-  • research_agent: attempt=1, tavily_hits=5, confidence_score=8.000, latency_ms=8424, cost_usd=0.004
-  • synthesis_agent: latency_ms=4125, cost_usd=0.002
+  • clarity_agent: clarity_status=clear, company=Tesla, latency_ms=7776, cost_usd=0.000
+  • research_agent: attempt=1, tavily_hits=5, confidence_score=8.000, latency_ms=9574, cost_usd=0.004
+      rewritten_query: 'Tesla company performance'
+      rewrite_rationale: The user repeated the company name, so I'm inferring the intent from the previous turn 'How is the company doing?'
+  • synthesis_agent: latency_ms=2979, cost_usd=0.001
+  • memory_writer: latency_ms=1854, cost_usd=0.000
 
 --- TURN 1 ASSISTANT ANSWER ---
-Tesla is showing a mixed but generally positive picture recently. Its stock rose over 3% on Thursday morning, finishing the week higher after a previous dip.
+Tesla appears to be experiencing a mix of positive developments and strategic shifts recently.
 
-In terms of operations, Tesla China saw a significant **36% year-over-year surge** in wholesale sales in April, marking the first time this year that volume exceeded 2024 levels. The company has also started "high volume" production of its Semi trucks and introduced more affordable "Standard" versions of its Model Y and Model 3.
+On the production front, Tesla's Semi truck has entered "high volume" production in Nevada, and its China-made electric vehicle sales saw a significant 36% year-on-year surge in April, marking six consecutive months of increases.
 
-However, there was a recent recall of over 218,000 vehicles (Model 3, Y, S, and X) due to a rearview camera image delay. Looking ahead, the reveal for the long-promised Roadster supercar is now anticipated in late May or June 2026. Tesla also recognized **$573 million** in sales from SpaceX and xAI last year.
+Financially, Tesla's (TSLA) stock has shown recovery, finishing a recent week higher after an earnings report drop and rising over 3% on a Thursday morning to surpass a key buy point.
 
-Turn 1 stats: research_attempts=1, validation_result=None, confidence_score=8.0, total_cost_usd=0.00595
+Strategically, Tesla recognized $573 million in sales from SpaceX and xAI last year, including Cybertruck purchases. The company is also reportedly pivoting towards robotics and semi-truck production. However, some analysts are concerned this focus might detract from its core car business, which faces an aging product line and a lack of new high-volume offerings.
+
+Turn 1 stats: research_attempts=1, validation_result=None, confidence_score=8.0, total_cost_usd=0.00584
 
 You (turn 2): What about their CEO?
 
 --- TURN 2 AUDIT TRAIL ---
-  • clarity_agent: clarity_status=needs_clarification, latency_ms=1499, cost_usd=0.000
+  • clarity_agent: clarity_status=needs_clarification, latency_ms=1885, cost_usd=0.000
   • interrupt_node: 
-  • clarity_agent: clarity_status=clear, company=Tesla, latency_ms=1708, cost_usd=0.000
-  • research_agent: attempt=1, tavily_hits=5, confidence_score=8.000, latency_ms=8424, cost_usd=0.004
-  • synthesis_agent: latency_ms=4125, cost_usd=0.002
-  • clarity_agent: clarity_status=clear, company=Tesla, latency_ms=1583, cost_usd=0.000
-  • research_agent: attempt=1, tavily_hits=5, confidence_score=9.000, latency_ms=8005, cost_usd=0.003
-  • synthesis_agent: latency_ms=3119, cost_usd=0.001
+  • clarity_agent: clarity_status=clear, company=Tesla, latency_ms=7776, cost_usd=0.000
+  • research_agent: attempt=1, tavily_hits=5, confidence_score=8.000, latency_ms=9574, cost_usd=0.004
+      rewritten_query: 'Tesla company performance'
+      rewrite_rationale: The user repeated the company name, so I'm inferring the intent from the previous turn 'How is the company doing?'
+  • synthesis_agent: latency_ms=2979, cost_usd=0.001
+  • memory_writer: latency_ms=1854, cost_usd=0.000
+  • clarity_agent: clarity_status=clear, company=Tesla, latency_ms=1741, cost_usd=0.000
+  • research_agent: attempt=1, tavily_hits=5, confidence_score=6.000, latency_ms=13264, cost_usd=0.005
+      rewritten_query: 'Tesla CEO Elon Musk leadership'
+      rewrite_rationale: Resolved 'their' to 'Tesla' and added 'CEO' and 'leadership' based on the conversation context and example.
+  • synthesis_agent: latency_ms=5035, cost_usd=0.002
+  • memory_writer: latency_ms=1966, cost_usd=0.000
 
 --- TURN 2 ASSISTANT ANSWER ---
-Tesla's CEO, Elon Musk, has been in the news recently for several reasons, including his compensation and ongoing strategic efforts.
+Looking at Tesla's CEO, Elon Musk, recent developments highlight his ongoing legal and strategic activities.
 
-His reported 2025 compensation was nearly **$158.4 billion**, though this is a stock-based plan approved by shareholders and he received no actual cash payment. This 10-year plan aims to retain him and maintain his focus on the company, with a potential value of up to $1 trillion if all targets are met. Musk is set to hold approximately a **20.3% stake** in Tesla.
+His partner, Shivon Zilis, recently testified in his lawsuit against OpenAI, revealing discussions where Musk suggested OpenAI become a subsidiary of Tesla and expressed concerns about talent competition. During his court appearance, a federal judge also issued stern words to Musk regarding his conduct outside the courtroom.
 
-In other developments, Musk is actively navigating skepticism from EU regulators regarding Tesla's "Full Self-Driving" system, despite his confidence in its approval. He also recently appeared in court for his case against OpenAI.
+Musk's leadership style emphasizes significant control, as evidenced by SpaceX's planned IPO structure which grants him over 50% voting power. His ongoing legal battle with OpenAI underscores his strategic focus on AI, including past proposals for OpenAI to integrate with Tesla. There is also a mention of the potential for Musk to merge SpaceX with Tesla in the future, leveraging his broad control.
 
 Turn 2 stats: research_attempts=1, company_carried=Tesla, messages_in_state=5
 

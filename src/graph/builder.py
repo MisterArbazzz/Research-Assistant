@@ -23,6 +23,8 @@ compile time, not runtime.
 
 from __future__ import annotations
 
+from typing import Any
+
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -30,6 +32,7 @@ from langgraph.graph.state import CompiledStateGraph
 from .nodes import (
     clarity_agent,
     interrupt_node,
+    memory_writer,
     research_agent,
     synthesis_agent,
     validator_agent,
@@ -42,14 +45,17 @@ from .routing import (
 from .state import ResearchState
 
 
-async def build_graph(checkpointer: BaseCheckpointSaver) -> CompiledStateGraph:
-    workflow: StateGraph = StateGraph(ResearchState)
+async def build_graph(
+    checkpointer: BaseCheckpointSaver[Any],
+) -> CompiledStateGraph[ResearchState, Any, Any, Any]:
+    workflow: StateGraph[ResearchState, Any, Any, Any] = StateGraph(ResearchState)
 
     workflow.add_node("clarity_agent", clarity_agent)
     workflow.add_node("interrupt_node", interrupt_node)
     workflow.add_node("research_agent", research_agent)
     workflow.add_node("validator_agent", validator_agent)
     workflow.add_node("synthesis_agent", synthesis_agent)
+    workflow.add_node("memory_writer", memory_writer)
 
     workflow.add_edge(START, "clarity_agent")
 
@@ -83,6 +89,7 @@ async def build_graph(checkpointer: BaseCheckpointSaver) -> CompiledStateGraph:
         },
     )
 
-    workflow.add_edge("synthesis_agent", END)
+    workflow.add_edge("synthesis_agent", "memory_writer")
+    workflow.add_edge("memory_writer", END)
 
     return workflow.compile(checkpointer=checkpointer)

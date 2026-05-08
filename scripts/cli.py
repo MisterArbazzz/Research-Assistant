@@ -38,13 +38,14 @@ if hasattr(sys.stderr, "buffer"):
 # Make `src` importable when running this file directly via `python scripts/cli.py`.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from langchain_core.messages import HumanMessage  # noqa: E402
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver  # noqa: E402
-from langgraph.types import Command  # noqa: E402
+from langchain_core.messages import HumanMessage
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langgraph.types import Command
 
-from src.config import get_settings  # noqa: E402
-from src.graph.builder import build_graph  # noqa: E402
-from src.logging_config import configure_logging  # noqa: E402
+from src.config import get_settings
+from src.graph.builder import build_graph
+from src.logging_config import configure_logging
+from src.observability import configure_langsmith, configure_tracer
 
 logger = logging.getLogger(__name__)
 
@@ -95,11 +96,15 @@ async def _run_turn_until_complete_or_interrupt(
 
 async def main() -> None:
     configure_logging()
+    configure_tracer()       # OTel — console exporter unless OTEL_EXPORTER_OTLP_ENDPOINT is set
+    configure_langsmith()    # No-op unless LANGSMITH_API_KEY is set in .env
     settings = get_settings()
     print(f"Research backend: {settings.RESEARCH_BACKEND}")
     print(f"Tavily key set:   {bool(settings.TAVILY_API_KEY)}")
     print(f"Models:           primary={settings.MODEL_PRIMARY}, qa={settings.MODEL_QA}")
     print(f"Max attempts:     {settings.MAX_RESEARCH_ATTEMPTS}")
+    print(f"Cost ceiling:     ${settings.COST_CEILING_PER_RUN_USD:.4f}/run")
+    print(f"LangSmith:        {'enabled' if settings.LANGSMITH_API_KEY else 'disabled'}")
     print()
 
     async with AsyncSqliteSaver.from_conn_string(str(CHECKPOINT_DB)) as checkpointer:
@@ -147,7 +152,7 @@ async def main() -> None:
                 final_state = await _run_turn_until_complete_or_interrupt(
                     graph, initial, config
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 _print_divider("RUN FAILED")
                 print(f"  {exc}")
                 continue

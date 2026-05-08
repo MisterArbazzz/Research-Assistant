@@ -1,21 +1,18 @@
 """FastAPI application factory + lifespan.
 
-Lifespan opens the Neo4j async driver, the AsyncSqliteSaver checkpointer,
-and (when wired) the compiled LangGraph. All resources are stashed on
-app.state and provided to routes via `deps.get_*`. Shutdown closes them
-in reverse order.
-
-The graph itself is wired by the use-case-specific `src/graph/builder.py`
-factory; the boilerplate ships with `app.state.graph = None` and the
-runs route returns 503 until the use case fills it in.
+Lifespan opens the AsyncSqliteSaver checkpointer and the compiled LangGraph.
+Everything is stashed on app.state and provided to routes via `deps.get_*`.
+Observability comes from LangSmith (cloud) + OpenTelemetry; no Neo4j audit
+graph in this build (the in-memory `state.audit_log` plus LangSmith traces
+already cover the observability story for our use case).
 """
 
 from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
-from typing import AsyncIterator
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,10 +20,10 @@ from fastapi.responses import JSONResponse
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
+from .graph.builder import build_graph
 from .logging_config import configure_logging
-from .neo4j_client.driver import Neo4jClient
 from .observability import configure_langsmith, configure_tracer
-from .routes import health, runs
+from .routes import health
 
 logger = logging.getLogger(__name__)
 
@@ -38,18 +35,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_langsmith()
 
     async with AsyncExitStack() as stack:
-        # Neo4j async driver
-        neo4j_client = Neo4jClient()
-        await neo4j_client.connect()
-        stack.push_async_callback(neo4j_client.close)
-
-        # SQLite checkpointer (swap to AsyncPostgresSaver for prod)
         checkpointer_cm = AsyncSqliteSaver.from_conn_string("./data/checkpoints.db")
         checkpointer = await stack.enter_async_context(checkpointer_cm)
 
-        app.state.neo4j = neo4j_client
         app.state.checkpointer = checkpointer
-        app.state.graph = None  # Use case wires this in: from .graph.builder import build_graph
+        app.state.graph = await build_graph(checkpointer)
 
         logger.info("startup complete")
         try:
@@ -60,7 +50,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="LangGraph Agent",
+        title="Research Assistant",
         version="0.1.0",
         lifespan=lifespan,
     )
@@ -78,8 +68,7 @@ def create_app() -> FastAPI:
     @app.exception_handler(Exception)
     async def fallback_handler(request: Request, exc: Exception) -> JSONResponse:
         # Top-level safety net — log the stack, return a structured 500 with a
-        # trace id the operator can grep for. Use-case routes catch their own
-        # business errors and return 4xx; this only fires for genuine bugs.
+        # trace id the operator can grep for.
         trace_id = str(uuid.uuid4())
         logger.exception(
             "unhandled exception",
@@ -91,7 +80,6 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(health.router, prefix="/api/v1")
-    app.include_router(runs.router, prefix="/api/v1")
 
     return app
 

@@ -23,14 +23,13 @@ import asyncio
 import logging
 from typing import Any, Literal, TypeVar
 
-from pydantic import BaseModel
-
 from google.api_core.exceptions import (
     DeadlineExceeded,
     ResourceExhausted,
     ServiceUnavailable,
 )
 from langchain_google_genai import ChatGoogleGenerativeAI
+from pydantic import BaseModel
 from tenacity import (
     before_sleep_log,
     retry,
@@ -164,7 +163,7 @@ async def ainvoke_structured(
 
     if not isinstance(result, dict):
         # Some integrations return the parsed model directly even with include_raw.
-        return result, None  # type: ignore[return-value]
+        return result, None
 
     parsed = result.get("parsed")
     raw = result.get("raw")

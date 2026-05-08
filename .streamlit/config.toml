@@ -1,0 +1,7 @@
+[server]
+# Don't reload the cached graph + checkpointer when source files change in
+# the deployed sandbox.
+fileWatcherType = "none"
+
+[browser]
+gatherUsageStats = false

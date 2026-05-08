@@ -2,8 +2,8 @@
 
 Per CLAUDE.md pattern #4: routing is pure — no LLM calls, no I/O. Iteration
 caps live in src/config.py and are read once here at the single enforcement
-site (route_after_validator). A grep for MAX_RESEARCH_ATTEMPTS should find it
-twice: definition in config.py, enforcement here.
+site. A grep for MAX_RESEARCH_ATTEMPTS / COST_CEILING_PER_RUN_USD should find
+each of them in two places: definition in config.py and enforcement here.
 """
 
 from __future__ import annotations
@@ -18,6 +18,16 @@ from .state import ResearchState
 RESEARCH_CONFIDENCE_THRESHOLD = 6.0
 
 
+def is_cost_ceiling_reached(state: ResearchState) -> bool:
+    """True when this run has spent at or above the configured per-run cap.
+
+    Pure helper used by the routing functions to short-circuit further LLM
+    calls. The cap doesn't kill the run — it routes straight to synthesis so
+    the user always gets *some* answer, even if it's based on partial data.
+    """
+    return state.total_cost_usd >= get_settings().COST_CEILING_PER_RUN_USD
+
+
 def route_after_clarity(
     state: ResearchState,
 ) -> Literal["interrupt_node", "research_agent"]:
@@ -30,7 +40,14 @@ def route_after_clarity(
 def route_after_research(
     state: ResearchState,
 ) -> Literal["validator_agent", "synthesis_agent"]:
-    """Research Agent → Validator (low confidence) OR Synthesis (high confidence)."""
+    """Research Agent → Validator (low confidence) OR Synthesis.
+
+    Synthesis is preferred when (a) confidence is high enough to skip QA,
+    or (b) the cost ceiling has been reached. Either way we want to put a
+    final answer in front of the user instead of burning more budget.
+    """
+    if is_cost_ceiling_reached(state):
+        return "synthesis_agent"
     if (
         state.confidence_score is not None
         and state.confidence_score >= RESEARCH_CONFIDENCE_THRESHOLD
@@ -42,14 +59,17 @@ def route_after_research(
 def route_after_validator(
     state: ResearchState,
 ) -> Literal["research_agent", "synthesis_agent"]:
-    """Validator → Research (retry) OR Synthesis (sufficient OR cap reached).
+    """Validator → Research (retry) OR Synthesis (sufficient / cap / ceiling).
 
-    Single enforcement site for MAX_RESEARCH_ATTEMPTS. When the cap is hit we
-    ship to synthesis with the validation notes attached so the user gets
-    *something*, not a silent stall.
+    Three short-circuit paths to synthesis:
+      1. Validator says findings are sufficient.
+      2. Research-attempt cap reached — ship with notes attached.
+      3. Cost ceiling reached — ship rather than burn more budget.
     """
     if state.validation_result == "sufficient":
         return "synthesis_agent"
     if state.research_attempts >= get_settings().MAX_RESEARCH_ATTEMPTS:
+        return "synthesis_agent"
+    if is_cost_ceiling_reached(state):
         return "synthesis_agent"
     return "research_agent"

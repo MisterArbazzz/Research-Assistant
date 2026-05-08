@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .clarity_agent import clarity_agent
 from .interrupt_node import interrupt_node
+from .memory_writer import memory_writer
 from .research_agent import research_agent
 from .synthesis_agent import synthesis_agent
 from .validator_agent import validator_agent
@@ -11,6 +12,7 @@ from .validator_agent import validator_agent
 __all__ = [
     "clarity_agent",
     "interrupt_node",
+    "memory_writer",
     "research_agent",
     "synthesis_agent",
     "validator_agent",

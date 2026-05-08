@@ -73,7 +73,10 @@ class ResearchState(BaseModel):
     # Synthesis output
     final_answer: str | None = None
 
-    # Bookkeeping
+    # Bookkeeping. `total_cost_usd` is REPLACE-ON-UPDATE: every LLM-using node
+    # is expected to return `state.total_cost_usd + cost` (the new cumulative
+    # value), not just its own delta. The cost-ceiling guard in routing.py
+    # reads this directly. `audit_log` is an accumulator (add reducer).
     total_cost_usd: float = 0.0
     audit_log: Annotated[list[dict[str, Any]], add] = Field(default_factory=list)
     messages: Annotated[list[BaseMessage], add_messages] = Field(default_factory=list)

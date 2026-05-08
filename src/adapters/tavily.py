@@ -95,10 +95,10 @@ async def _live_search(
                 ),
                 timeout=TAVILY_TIMEOUT_SECONDS,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("tavily search timed out", extra={"query": query})
             return []
-        except Exception as exc:  # noqa: BLE001 — surface any SDK error as empty hits
+        except Exception as exc:
             logger.exception("tavily search failed", extra={"query": query, "error": str(exc)})
             return []
     finally:

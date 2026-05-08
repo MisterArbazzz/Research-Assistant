@@ -12,15 +12,10 @@ from typing import Any
 from fastapi import Request
 
 from .config import Settings, get_settings
-from .neo4j_client.driver import Neo4jClient
-
-
-def get_neo4j(request: Request) -> Neo4jClient:
-    return request.app.state.neo4j  # type: ignore[no-any-return]
 
 
 def get_graph(request: Request) -> Any:
-    """Returns the compiled LangGraph or None if not yet wired for this use case."""
+    """Returns the compiled LangGraph."""
     return request.app.state.graph
 
 
@@ -28,4 +23,4 @@ def get_checkpointer(request: Request) -> Any:
     return request.app.state.checkpointer
 
 
-__all__ = ["get_neo4j", "get_graph", "get_checkpointer", "get_settings", "Settings"]
+__all__ = ["Settings", "get_checkpointer", "get_graph", "get_settings"]

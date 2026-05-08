@@ -34,13 +34,14 @@ if hasattr(sys.stderr, "buffer"):
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from langchain_core.messages import HumanMessage  # noqa: E402
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver  # noqa: E402
-from langgraph.types import Command  # noqa: E402
+from langchain_core.messages import HumanMessage
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langgraph.types import Command
 
-from src.config import get_settings  # noqa: E402
-from src.graph.builder import build_graph  # noqa: E402
-from src.logging_config import configure_logging  # noqa: E402
+from src.config import get_settings
+from src.graph.builder import build_graph
+from src.logging_config import configure_logging
+from src.observability import configure_langsmith, configure_tracer
 
 EXAMPLES_DIR = Path(__file__).resolve().parent
 CHECKPOINT_DB = Path("./data/example_checkpoints.db")
@@ -104,9 +105,13 @@ def _format_audit_log(audit_log: list[dict]) -> str:
                     bits.append(f"{key}={val:.3f}")
                 else:
                     bits.append(f"{key}={val}")
-        if "notes" in entry and entry["notes"]:
+        if entry.get("notes"):
             bits.append(f"notes={entry['notes']}")
         lines.append(f"  • {node}: " + ", ".join(bits))
+        if "rewritten_query" in entry:
+            lines.append(f"      rewritten_query: {entry['rewritten_query']!r}")
+        if "rewrite_rationale" in entry and entry.get("rewrite_rationale"):
+            lines.append(f"      rewrite_rationale: {entry['rewrite_rationale']}")
     return "\n".join(lines)
 
 
@@ -226,10 +231,14 @@ async def run_two(graph: object, tw: TranscriptWriter) -> None:
 
 async def main() -> None:
     configure_logging()
+    configure_tracer()
+    configure_langsmith()
     settings = get_settings()
     print(f"Research backend: {settings.RESEARCH_BACKEND}")
     print(f"Tavily key set:   {bool(settings.TAVILY_API_KEY)}")
     print(f"Max attempts:     {settings.MAX_RESEARCH_ATTEMPTS}")
+    print(f"Cost ceiling:     ${settings.COST_CEILING_PER_RUN_USD:.4f}/run")
+    print(f"LangSmith:        {'enabled' if settings.LANGSMITH_API_KEY else 'disabled'}")
     print()
 
     # Wipe the demo checkpoint so reruns don't conflict on existing thread state.

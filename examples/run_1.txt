@@ -2,28 +2,29 @@
 RUN 1 — Clear query (validator-retry-loop scenario)
 ========================================================================
 
-thread_id: demo-1-c2b890da
+thread_id: demo-1-99c154d5
 
 You: Tell me about Apple's recent news and how the stock is doing
 
 --- AUDIT TRAIL ---
-  • clarity_agent: clarity_status=clear, company=Apple, latency_ms=1313, cost_usd=0.000
-  • research_agent: attempt=1, tavily_hits=5, confidence_score=9.000, latency_ms=9235, cost_usd=0.004
-  • synthesis_agent: latency_ms=3024, cost_usd=0.001
+  • clarity_agent: clarity_status=clear, company=Apple, latency_ms=1673, cost_usd=0.000
+  • research_agent: attempt=1, tavily_hits=5, confidence_score=9.000, latency_ms=13059, cost_usd=0.004
+      rewritten_query: 'Apple Inc recent news stock price'
+      rewrite_rationale: Canonicalized company name to 'Apple Inc' and simplified 'how the stock is doing' to 'stock price'.
+  • synthesis_agent: latency_ms=3050, cost_usd=0.001
+  • memory_writer: latency_ms=4272, cost_usd=0.000
 
 --- RESEARCH FINDINGS ---
 {
-  "recent_news": "Apple recently reported better-than-expected quarterly results, driven by strong demand for its iPhone 17 and Mac computers, and issued revenue guidance for the current quarter (Q3) that significantly surpassed analysts' estimates, projecting 14% to 17% growth. This strong performance was partly fueled by a 20% increase in iPhone revenue for the second consecutive quarter and robust growth in China.",
-  "stock_info": "Following the upbeat earnings report, Apple's (AAPL) stock experienced a sharp rally, jumping over 4% on Thursday and climbing roughly 5% on Friday, marking its sharpest rally since August. Several Wall Street analysts reacted by raising their price targets, with Morgan Stanley increasing its target to $330 and Wells Fargo to $310, reflecting growing confidence in Apple's outlook and leading to a consensus Moderate Buy rating with an average price target of $310.95.",
-  "key_developments": "Despite strong sales, Apple faces challenges from an extended global memory crunch and supply constraints, which CEO Tim Cook noted could impact margins. Looking ahead, the company is preparing for a significant leadership transition with John Ternus set to replace Tim Cook as CEO in September, and investors are anticipating updates on Apple's artificial intelligence strategy at the upcoming Worldwide Developers Conference (WWDC) in June, alongside expectations for a foldable iPhone."
+  "recent_news": "Apple recently raised the starting price of its Mac mini to $799, up from $599, by removing the entry-level configuration, a move attributed to inventory shortages driven by AI demand and tight processor supply. Additionally, Apple's stock saw a significant pop following a strong Q2 earnings beat, which prompted several top analysts to increase their price targets for the company.",
+  "stock_info": "Following its Q2 earnings beat, Apple's stock (AAPL) experienced a surge, leading analysts like Wells Fargo and Morgan Stanley to raise their price targets to $310 and $330 respectively, both maintaining Buy ratings. AAPL currently holds a consensus Moderate Buy rating from 27 Wall Street analysts, with an average price target of $310.95, suggesting an 11% upside from current levels.",
+  "key_developments": "Apple is reportedly in early discussions with Intel and Samsung Electronics regarding the manufacturing of its main device processors in the United States, signaling a strategic effort to diversify its supply chain beyond its current reliance on TSMC. The company's adjustment of the Mac mini pricing also reflects its response to the increasing demand for AI-capable hardware and the associated supply chain challenges for processors."
 }
 
 --- ASSISTANT'S FINAL ANSWER ---
-Apple recently shared some great news, reporting better-than-expected quarterly results! This strong performance was driven by robust demand for its iPhone 17 and Mac computers, with iPhone revenue specifically increasing by 20% for the second quarter in a row. The company also issued revenue guidance for the current quarter (Q3) that significantly surpassed analysts' estimates, projecting 14% to 17% growth.
+Apple's stock has been performing well recently, experiencing a significant surge following a strong Q2 earnings beat. This performance prompted several top analysts, including Wells Fargo and Morgan Stanley, to raise their price targets for the company to $310 and $330 respectively, both maintaining Buy ratings. Overall, Apple (AAPL) currently holds a consensus Moderate Buy rating from 27 Wall Street analysts, with an average price target of $310.95, suggesting an 11% upside from current levels.
 
-Following this upbeat report, Apple's (AAPL) stock saw a sharp rally, jumping over 4% on Thursday and climbing roughly 5% on Friday, marking its best rally since August. Wall Street analysts reacted positively, with many raising their price targets; for example, Morgan Stanley increased its target to $330 and Wells Fargo to $310. The stock currently holds a consensus "Moderate Buy" rating with an average price target of $310.95.
+In terms of recent news, Apple adjusted the starting price of its Mac mini to $799, up from $599, by removing the entry-level configuration. This move is attributed to inventory shortages driven by high demand for AI-capable hardware and tight processor supply. Additionally, Apple is reportedly in early discussions with Intel and Samsung Electronics about manufacturing its main device processors in the United States, signaling a strategic effort to diversify its supply chain beyond its current reliance on TSMC.
 
-Looking ahead, Apple is preparing for a significant leadership transition with John Ternus set to replace Tim Cook as CEO in September. Investors are also eagerly awaiting updates on Apple's artificial intelligence strategy at the upcoming Worldwide Developers Conference (WWDC) in June.
-
-Stats: research_attempts=1, validation_result=None, confidence_score=9.0, total_cost_usd=0.00581
+Stats: research_attempts=1, validation_result=None, confidence_score=9.0, total_cost_usd=0.00564
 

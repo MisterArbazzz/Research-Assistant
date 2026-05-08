@@ -8,6 +8,7 @@ guard against regressions when the cap or threshold gets touched.
 from __future__ import annotations
 
 from src.graph.routing import (
+    is_cost_ceiling_reached,
     route_after_clarity,
     route_after_research,
     route_after_validator,
@@ -62,4 +63,52 @@ def test_validator_cap_short_circuits_to_synthesis(settings_override) -> None:
     get_settings.cache_clear()
 
     s = _state(validation_result="insufficient", research_attempts=3)
+    assert route_after_validator(s) == "synthesis_agent"
+
+
+def test_cost_ceiling_guard_below_limit(settings_override) -> None:
+    settings_override(GOOGLE_API_KEY="x", COST_CEILING_PER_RUN_USD=0.10)
+    from src.config import get_settings
+
+    get_settings.cache_clear()
+
+    assert is_cost_ceiling_reached(_state(total_cost_usd=0.05)) is False
+
+
+def test_cost_ceiling_guard_at_or_above_limit(settings_override) -> None:
+    settings_override(GOOGLE_API_KEY="x", COST_CEILING_PER_RUN_USD=0.10)
+    from src.config import get_settings
+
+    get_settings.cache_clear()
+
+    # >= ceiling triggers the guard
+    assert is_cost_ceiling_reached(_state(total_cost_usd=0.10)) is True
+    assert is_cost_ceiling_reached(_state(total_cost_usd=0.25)) is True
+
+
+def test_research_short_circuits_to_synthesis_when_ceiling_hit(settings_override) -> None:
+    settings_override(GOOGLE_API_KEY="x", COST_CEILING_PER_RUN_USD=0.001)
+    from src.config import get_settings
+
+    get_settings.cache_clear()
+
+    # Even with low confidence, ceiling forces synthesis to bound spend
+    s = _state(confidence_score=2.0, total_cost_usd=0.005)
+    assert route_after_research(s) == "synthesis_agent"
+
+
+def test_validator_short_circuits_to_synthesis_when_ceiling_hit(settings_override) -> None:
+    settings_override(
+        GOOGLE_API_KEY="x", COST_CEILING_PER_RUN_USD=0.001, MAX_RESEARCH_ATTEMPTS=3
+    )
+    from src.config import get_settings
+
+    get_settings.cache_clear()
+
+    # Insufficient + attempts left would normally retry, but ceiling overrides
+    s = _state(
+        validation_result="insufficient",
+        research_attempts=1,
+        total_cost_usd=0.005,
+    )
     assert route_after_validator(s) == "synthesis_agent"
