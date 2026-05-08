@@ -93,6 +93,9 @@ async def validator_agent(state: ResearchState, config: RunnableConfig) -> dict[
                     "node": "validator_agent",
                     "latency_ms": latency_ms,
                     "cost_usd": cost_usd,
+                    "input_tokens": in_tokens,
+                    "output_tokens": out_tokens,
+                    "model": settings.MODEL_QA,
                     "validation_result": verdict.validation_result,
                     "notes": verdict.notes,
                 }

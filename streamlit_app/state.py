@@ -1,23 +1,31 @@
-"""Session-state bootstrap + persistent event loop + cached graph.
+"""Session-state bootstrap + persistent event-loop thread + cached graph.
 
 The Streamlit app needs to run async code (LangGraph, Tavily, sqlite-vec)
-from synchronous button callbacks. The naive `asyncio.run()` per call
-recreates the loop each time, which invalidates aiosqlite connections
-held by AsyncSqliteSaver and the cached flashrank ranker. That breaks on
-the second turn (interrupt resume) with `RuntimeError: got Future
-attached to a different loop`.
+from synchronous Streamlit callbacks. The naive approaches all break:
 
-Fix: ONE persistent loop per Streamlit session, owned by `session_state`,
-and cached resources (graph + checkpointer) are bound to that loop.
-Every async call goes through `run_async(coro)` below.
+  - `asyncio.run()` per call recreates the loop and invalidates aiosqlite
+    connections cached by AsyncSqliteSaver.
+  - A persistent loop in `st.session_state` runs on whichever Streamlit
+    ScriptRunner thread happened to be active when first created. On the
+    NEXT rerun Streamlit spawns a different ScriptRunner thread; calling
+    `loop.run_until_complete()` from that new thread leaves aiosqlite's
+    worker thread orphaned and the connection raises "Connection closed"
+    on next use.
+  - `nest_asyncio` is incompatible with aiosqlite's threading model.
+
+The fix used here: a SINGLE dedicated background thread that owns the
+event loop for the entire process lifetime. Async work is scheduled
+across thread boundaries via `asyncio.run_coroutine_threadsafe`. Every
+resource bound to the loop (aiosqlite connections, etc.) stays valid as
+long as the process is up.
 """
 
 from __future__ import annotations
 
 import asyncio
 import os
+import threading
 import uuid
-from contextlib import AsyncExitStack
 from pathlib import Path
 from typing import Any
 
@@ -32,58 +40,103 @@ from src.observability import configure_langsmith, configure_tracer
 CHECKPOINT_DB = Path("./data/streamlit_checkpoints.db")
 CHECKPOINT_DB.parent.mkdir(parents=True, exist_ok=True)
 
-# Marker we use to detect first-render bootstrap inside a session.
 _BOOTSTRAP_KEY = "_bootstrapped"
 
 
-def _get_or_create_loop() -> asyncio.AbstractEventLoop:
-    """Get the session's persistent loop; create one if missing."""
-    if "loop" not in st.session_state:
-        loop = asyncio.new_event_loop()
-        st.session_state["loop"] = loop
-    return st.session_state["loop"]  # type: ignore[no-any-return]
+class _LoopThread:
+    """Dedicated daemon thread that owns one asyncio event loop forever."""
+
+    def __init__(self) -> None:
+        self.loop = asyncio.new_event_loop()
+        self.thread = threading.Thread(
+            target=self._run,
+            name="streamlit-asyncio-loop",
+            daemon=True,
+        )
+        self.thread.start()
+        # Wait until the loop is actually running before we hand it out.
+        ready = threading.Event()
+        self.loop.call_soon_threadsafe(ready.set)
+        ready.wait(timeout=5.0)
+
+    def _run(self) -> None:
+        asyncio.set_event_loop(self.loop)
+        self.loop.run_forever()
+
+    def run(self, coro: Any) -> Any:
+        """Schedule `coro` on the loop's thread; block until it returns."""
+        future = asyncio.run_coroutine_threadsafe(coro, self.loop)
+        return future.result()
+
+
+@st.cache_resource(show_spinner=False)
+def _get_loop_thread() -> _LoopThread:
+    """One LoopThread per process (cached across all sessions)."""
+    return _LoopThread()
 
 
 def run_async(coro: Any) -> Any:
-    """Run `coro` on the session's persistent event loop.
+    """Run `coro` on the dedicated background loop, with the calling
+    Streamlit session's script-run context attached to the loop thread.
 
-    Use this everywhere instead of `asyncio.run()`. Resources captured by
-    the coroutine (Saver, ranker, etc.) stay bound to the same loop across
-    Streamlit reruns and across interrupt-resume cycles.
+    Why the ctx attach: callbacks invoked from inside the coroutine
+    (e.g. live-update callbacks for `st.status` blocks) execute on the
+    LoopThread, not the Streamlit ScriptRunner thread. Streamlit element
+    methods (`.update()`, `.write()`, etc.) silently no-op when called
+    from a thread without an attached script-run context. Attaching the
+    caller's ctx for the duration of this run makes those cross-thread
+    UI updates land in the right session's render queue.
+
+    Safe for our single-user demo. For multi-tenant deployments you'd
+    want one LoopThread per session instead of one per process.
     """
-    loop = _get_or_create_loop()
-    return loop.run_until_complete(coro)
+    from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
+
+    loop_thread = _get_loop_thread()
+    ctx = get_script_run_ctx()
+    if ctx is not None:
+        add_script_run_ctx(loop_thread.thread, ctx)
+    try:
+        return loop_thread.run(coro)
+    finally:
+        # Detach so a later run from a different session doesn't inherit
+        # this session's context.
+        if ctx is not None:
+            add_script_run_ctx(loop_thread.thread, None)
 
 
-@st.cache_resource(show_spinner="Building agent graph (one-time)…")
+# Persistent reference holder — the AsyncSqliteSaver context manager must
+# stay alive for the lifetime of the process so its aiosqlite connection
+# isn't garbage-collected. `st.cache_resource` keeps the saver itself, but
+# the *context manager* that owns the connection's __aexit__ is otherwise
+# orphaned. We stash it here.
+_KEEPALIVE: list[Any] = []
+
+
+@st.cache_resource(show_spinner="Building agent graph (one-time, ~3s)…")
 def get_graph_and_saver() -> tuple[Any, Any]:
     """Build the compiled graph + AsyncSqliteSaver once per process.
 
-    `st.cache_resource` survives Streamlit reruns within a session AND
-    across sessions on the same server, which is what we want — the
-    flashrank model load (~3s) and sqlite WAL setup happen exactly once.
-
-    The AsyncSqliteSaver is normally an async context manager; we enter
-    its context manually here and stash the AsyncExitStack on the cached
-    object so the WAL gets a chance to flush on shutdown.
+    The saver's aiosqlite connection is bound to the LoopThread's loop —
+    every subsequent `run_async(coro)` schedules on that same loop, so
+    the connection stays valid forever.
     """
     configure_logging()
     configure_tracer()
     configure_langsmith()
 
-    loop = _get_or_create_loop()
+    loop_thread = _get_loop_thread()
 
-    async def _build() -> tuple[Any, Any, AsyncExitStack]:
-        stack = AsyncExitStack()
-        saver = await stack.enter_async_context(
-            AsyncSqliteSaver.from_conn_string(str(CHECKPOINT_DB))
-        )
+    async def _build() -> tuple[Any, Any, Any]:
+        # Enter the saver's async context manager manually and keep the cm
+        # alive — see _KEEPALIVE module-level list above.
+        saver_cm = AsyncSqliteSaver.from_conn_string(str(CHECKPOINT_DB))
+        saver = await saver_cm.__aenter__()
         graph = await build_graph(saver)
-        return graph, saver, stack
+        return graph, saver, saver_cm
 
-    graph, saver, _stack = loop.run_until_complete(_build())
-    # Best-effort cleanup — Streamlit doesn't expose a clean shutdown hook
-    # in cache_resource, but SQLite WAL recovers automatically on next open.
+    graph, saver, saver_cm = loop_thread.run(_build())
+    _KEEPALIVE.append(saver_cm)
     return graph, saver
 
 
@@ -94,8 +147,8 @@ def init_session_state() -> None:
 
     st.session_state[_BOOTSTRAP_KEY] = True
     st.session_state.setdefault("thread_id", str(uuid.uuid4()))
-    st.session_state.setdefault("user_id", "interviewer")
-    st.session_state.setdefault("messages", [])  # rendered chat history
+    st.session_state.setdefault("user_id", "demo")
+    st.session_state.setdefault("messages", [])
     st.session_state.setdefault("turn_count", 0)
     st.session_state.setdefault("session_cost_usd", 0.0)
     st.session_state.setdefault("last_run_audit", [])
@@ -105,7 +158,7 @@ def init_session_state() -> None:
     st.session_state.setdefault("awaiting_clarification", False)
     st.session_state.setdefault("clarification_payload", None)
     st.session_state.setdefault("settings_overrides", {})
-    st.session_state.setdefault("ab_history", [])  # for A/B compare widget
+    st.session_state.setdefault("ab_history", [])
 
 
 def reset_conversation() -> None:

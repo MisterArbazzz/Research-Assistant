@@ -16,20 +16,15 @@ from pathlib import Path
 # Make `src` importable when running this file directly.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import streamlit as st
 
-def _setup_stdout_utf8() -> None:
-    """Windows console UTF-8 — only when running as main, not on test import."""
-    import io
-
-    if hasattr(sys.stdout, "buffer"):
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-    if hasattr(sys.stderr, "buffer"):
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
-
-import streamlit as st  # noqa: E402
-
-from streamlit_app.components import runtime_settings_pills  # noqa: E402
-from streamlit_app.pages import (  # noqa: E402
+from streamlit_app.components import runtime_settings_pills
+from streamlit_app.state import (
+    init_session_state,
+    reset_conversation,
+    runtime_settings_summary,
+)
+from streamlit_app.tabs import (
     architecture_tab,
     chat_tab,
     eval_tab,
@@ -37,11 +32,6 @@ from streamlit_app.pages import (  # noqa: E402
     retrieval_tab,
     settings_tab,
     trace_tab,
-)
-from streamlit_app.state import (  # noqa: E402
-    init_session_state,
-    reset_conversation,
-    runtime_settings_summary,
 )
 
 
@@ -77,7 +67,6 @@ def _sidebar() -> None:
 
 
 def main() -> None:
-    _setup_stdout_utf8()
     st.set_page_config(
         page_title="Research Assistant — Demo",
         page_icon="🔬",

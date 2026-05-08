@@ -127,6 +127,8 @@ async def memory_writer(state: ResearchState, config: RunnableConfig) -> dict[st
 
         latency_ms = int((perf_counter() - t0) * 1000)
         cost_usd = estimate_cost(settings.MODEL_PRIMARY, usage)
+        in_tokens = int((usage or {}).get("input_tokens", 0))
+        out_tokens = int((usage or {}).get("output_tokens", 0))
 
         # Selective write: store each extracted fact. Failures per-fact are
         # swallowed (warning logged) — one bad write shouldn't block others.
@@ -152,6 +154,9 @@ async def memory_writer(state: ResearchState, config: RunnableConfig) -> dict[st
                     "node": "memory_writer",
                     "latency_ms": latency_ms,
                     "cost_usd": cost_usd,
+                    "input_tokens": in_tokens,
+                    "output_tokens": out_tokens,
+                    "model": settings.MODEL_PRIMARY,
                     "facts_written": written,
                     "facts": extracted.facts,
                 }

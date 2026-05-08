@@ -109,6 +109,9 @@ async def synthesis_agent(state: ResearchState, config: RunnableConfig) -> dict[
                     "node": "synthesis_agent",
                     "latency_ms": latency_ms,
                     "cost_usd": cost_usd,
+                    "input_tokens": in_tokens,
+                    "output_tokens": out_tokens,
+                    "model": settings.MODEL_PRIMARY,
                     "answer_chars": len(answer_text),
                 }
             ],

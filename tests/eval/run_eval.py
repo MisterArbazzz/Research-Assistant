@@ -24,20 +24,6 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-# Hermetic + deterministic — must be set BEFORE src.config is imported.
-os.environ["RESEARCH_BACKEND"] = "mock"
-# Prevent Tavily live calls even if a key happens to be in env.
-os.environ["TAVILY_API_KEY"] = ""
-# Disable rerank for the eval — keeps the pipeline simple and fast since
-# mock data already returns canonical-relevance hits.
-os.environ["RERANK_ENABLED"] = "false"
-
-# Windows console UTF-8 (model output uses em dashes, smart quotes, arrows)
-if hasattr(sys.stdout, "buffer"):
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-if hasattr(sys.stderr, "buffer"):
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from langchain_core.messages import HumanMessage
@@ -57,8 +43,29 @@ from tests.eval.metrics import (
 )
 from tests.eval.trajectory_eval import evaluate_trajectory
 
-# Force a clean settings cache after env mutation above.
-get_settings.cache_clear()
+
+def _setup_main_only_env() -> None:
+    """Hermetic + deterministic env for CLI invocation.
+
+    Important: only called from `if __name__ == "__main__"`. Doing this
+    at module top-level would clobber env vars for any other process
+    that imports `run_case` / `score_case` (e.g. the Streamlit Eval tab,
+    which has its own save/restore around mock-mode env mutations).
+    """
+    os.environ["RESEARCH_BACKEND"] = "mock"
+    os.environ["TAVILY_API_KEY"] = ""
+    os.environ["RERANK_ENABLED"] = "false"
+    get_settings.cache_clear()
+
+    # Windows console UTF-8 (model output uses em dashes, smart quotes, arrows).
+    if hasattr(sys.stdout, "buffer"):
+        sys.stdout = io.TextIOWrapper(  # type: ignore[assignment]
+            sys.stdout.buffer, encoding="utf-8", errors="replace"
+        )
+    if hasattr(sys.stderr, "buffer"):
+        sys.stderr = io.TextIOWrapper(  # type: ignore[assignment]
+            sys.stderr.buffer, encoding="utf-8", errors="replace"
+        )
 
 
 def _new_turn_payload(user_query: str) -> dict[str, Any]:
@@ -362,4 +369,5 @@ async def main() -> int:
 
 
 if __name__ == "__main__":
+    _setup_main_only_env()
     raise SystemExit(asyncio.run(main()))

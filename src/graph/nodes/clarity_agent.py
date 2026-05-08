@@ -87,6 +87,9 @@ async def clarity_agent(state: ResearchState, config: RunnableConfig) -> dict[st
                     "node": "clarity_agent",
                     "latency_ms": latency_ms,
                     "cost_usd": cost_usd,
+                    "input_tokens": in_tokens,
+                    "output_tokens": out_tokens,
+                    "model": settings.MODEL_PRIMARY,
                     "clarity_status": parsed.clarity_status,
                     "company": parsed.company,
                 }
