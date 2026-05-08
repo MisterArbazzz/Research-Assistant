@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Environment
+.env
+
+# Local data
+data/checkpoints.db
+data/checkpoints.db-journal
+data/example_checkpoints.db
+data/example_checkpoints.db-journal
+data/seed/embeddings_cache/
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Build
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db

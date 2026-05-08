@@ -1,0 +1,29 @@
+========================================================================
+RUN 1 — Clear query (validator-retry-loop scenario)
+========================================================================
+
+thread_id: demo-1-c2b890da
+
+You: Tell me about Apple's recent news and how the stock is doing
+
+--- AUDIT TRAIL ---
+  • clarity_agent: clarity_status=clear, company=Apple, latency_ms=1313, cost_usd=0.000
+  • research_agent: attempt=1, tavily_hits=5, confidence_score=9.000, latency_ms=9235, cost_usd=0.004
+  • synthesis_agent: latency_ms=3024, cost_usd=0.001
+
+--- RESEARCH FINDINGS ---
+{
+  "recent_news": "Apple recently reported better-than-expected quarterly results, driven by strong demand for its iPhone 17 and Mac computers, and issued revenue guidance for the current quarter (Q3) that significantly surpassed analysts' estimates, projecting 14% to 17% growth. This strong performance was partly fueled by a 20% increase in iPhone revenue for the second consecutive quarter and robust growth in China.",
+  "stock_info": "Following the upbeat earnings report, Apple's (AAPL) stock experienced a sharp rally, jumping over 4% on Thursday and climbing roughly 5% on Friday, marking its sharpest rally since August. Several Wall Street analysts reacted by raising their price targets, with Morgan Stanley increasing its target to $330 and Wells Fargo to $310, reflecting growing confidence in Apple's outlook and leading to a consensus Moderate Buy rating with an average price target of $310.95.",
+  "key_developments": "Despite strong sales, Apple faces challenges from an extended global memory crunch and supply constraints, which CEO Tim Cook noted could impact margins. Looking ahead, the company is preparing for a significant leadership transition with John Ternus set to replace Tim Cook as CEO in September, and investors are anticipating updates on Apple's artificial intelligence strategy at the upcoming Worldwide Developers Conference (WWDC) in June, alongside expectations for a foldable iPhone."
+}
+
+--- ASSISTANT'S FINAL ANSWER ---
+Apple recently shared some great news, reporting better-than-expected quarterly results! This strong performance was driven by robust demand for its iPhone 17 and Mac computers, with iPhone revenue specifically increasing by 20% for the second quarter in a row. The company also issued revenue guidance for the current quarter (Q3) that significantly surpassed analysts' estimates, projecting 14% to 17% growth.
+
+Following this upbeat report, Apple's (AAPL) stock saw a sharp rally, jumping over 4% on Thursday and climbing roughly 5% on Friday, marking its best rally since August. Wall Street analysts reacted positively, with many raising their price targets; for example, Morgan Stanley increased its target to $330 and Wells Fargo to $310. The stock currently holds a consensus "Moderate Buy" rating with an average price target of $310.95.
+
+Looking ahead, Apple is preparing for a significant leadership transition with John Ternus set to replace Tim Cook as CEO in September. Investors are also eagerly awaiting updates on Apple's artificial intelligence strategy at the upcoming Worldwide Developers Conference (WWDC) in June.
+
+Stats: research_attempts=1, validation_result=None, confidence_score=9.0, total_cost_usd=0.00581
+
